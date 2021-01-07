@@ -96,50 +96,35 @@ namespace CryptoHIGHT
             0x76,0x2E,0xC6,0x9E,0x17,0x4F,0xA7,0xFF
         };
 
-        readonly byte[] testRoundKey = {
-            0x0a, 0xd4, 0x05, 0x89, 0x88, 0xe3, 0x4f, 0x8f, 0xe2, 0x50, 0x85, 0xaa, 0x15, 0x1d, 0x7c, 0x32,
-            0x49, 0x23, 0xac, 0x83, 0x70, 0x07, 0x5e, 0xb5, 0x47, 0xb3, 0xf8, 0x99, 0xf4, 0x7a, 0x50, 0x95,
-            0xd7, 0x50, 0x66, 0x0d, 0x73, 0x68, 0x43, 0x3c, 0xd4, 0x1e, 0x9e, 0xee, 0x54, 0xd1, 0x29, 0x67,
-            0x2d, 0xdd, 0x13, 0x48, 0xfe, 0xac, 0x84, 0x51, 0x55, 0xd8, 0x20, 0x9f, 0x2e, 0x74, 0xe1, 0x31,
-            0xe8, 0x0f, 0xce, 0x4b, 0x24, 0xec, 0xa3, 0x80, 0x43, 0x34, 0x87, 0x38, 0xeb, 0x54, 0xc7, 0x0b,
-            0x88, 0x53, 0x44, 0xa8, 0xf8, 0xfa, 0xd7, 0x98, 0xff, 0x40, 0x73, 0xe7, 0x68, 0x03, 0x20, 0x6d,
-            0x86, 0x31, 0x27, 0x6e, 0xbd, 0x03, 0x40, 0xba, 0x62, 0xd8, 0x2c, 0x29, 0x82, 0xf5, 0x8a, 0xe4,
-            0xd4, 0x57, 0x1a, 0xdc, 0x49, 0xab, 0xfa, 0x3b, 0x47, 0x81, 0xa8, 0x14, 0x5d, 0x9c, 0x42, 0xf0,
-            0x67, 0xce, 0x94, 0x38, 0x2b, 0x70, 0xbe, 0x43
-        };
-        readonly byte[] testUserKey = { 0x88, 0xE3, 0x4F, 0x8F, 0x08, 0x17, 0x79, 0xF1, 0xE9, 0xF3, 0x94, 0x37, 0x0A, 0xD4, 0x05, 0x89 };
-
-        public ecb()
+        //whitening Key [8] + sub Key[128]
+        byte[] scheduleKey = new byte[136];
+        public ecb(byte[] userKey)
         {
-
+            KeySched(userKey);
         }
 
-        byte[] KeySched(byte[] userKey)
+        void KeySched(byte[] userKey)
         {
-            byte[] roundKey = new byte[136];
             for (int i = 0; i < 4; i++)
             {
-                roundKey[i] = userKey[i + 12];
-                roundKey[i + 4] = userKey[i];
+                scheduleKey[i] = userKey[i + 12];
+                scheduleKey[i + 4] = userKey[i];
             }
 
             for (int i = 0; i < 8; i++)
             {
                 for (int j = 0; j < 8; j++)
                 {
-                    roundKey[8 + 16 * i + j] = (byte)((userKey[(j - i) & 7] + hightDelta[(16 * i + j)]) & 0xFF);
+                    scheduleKey[8 + 16 * i + j] = (byte)((userKey[(j - i) & 7] + hightDelta[(16 * i + j)]) & 0xFF);
                 }
                 for (int j = 0; j < 8; j++)
                 {
-                    roundKey[8 + 16 * i + j + 8] = (byte)((userKey[((j - i) & 7) + 8] + hightDelta[16 * i + j + 8]) & 0xFF);
+                    scheduleKey[8 + 16 * i + j + 8] = (byte)((userKey[((j - i) & 7) + 8] + hightDelta[16 * i + j + 8]) & 0xFF);
                 }
             }
-            return roundKey;
         }
 
-
-
-        void Decrypt(byte[] roundKey, byte[] dataIn, byte[] dataOut)
+        void DecryptBlock(byte[] dataIn, byte[] dataOut)
         {
             byte[] xx = new byte[8];
 
@@ -148,19 +133,19 @@ namespace CryptoHIGHT
             xx[6] = dataIn[5];
             xx[0] = dataIn[7];
 
-            //void HIGHT_DEC(byte[] roundKey, byte[] xx, int k, int i0, int i1, int i2, int i3, int i4, int i5, int i6, int i7)
+            //void HIGHT_DEC(byte[] scheduleKey, byte[] xx, int k, int i0, int i1, int i2, int i3, int i4, int i5, int i6, int i7)
             void HIGHT_DEC(int k, int i0, int i1, int i2, int i3, int i4, int i5, int i6, int i7)
             {
-                xx[i1] = (byte)((xx[i1] - (hightF1[xx[i2]] ^ roundKey[4 * k + 2])) & 0xFF);
-                xx[i3] = (byte)((xx[i3] ^ (hightF0[xx[i4]] + roundKey[4 * k + 1])) & 0xFF);
-                xx[i5] = (byte)((xx[i5] - (hightF1[xx[i6]] ^ roundKey[4 * k + 0])) & 0xFF);
-                xx[i7] = (byte)((xx[i7] ^ (hightF0[xx[i0]] + roundKey[4 * k + 3])) & 0xFF);
+                xx[i1] = (byte)((xx[i1] - (hightF1[xx[i2]] ^ scheduleKey[4 * k + 2])) & 0xFF);
+                xx[i3] = (byte)((xx[i3] ^ (hightF0[xx[i4]] + scheduleKey[4 * k + 1])) & 0xFF);
+                xx[i5] = (byte)((xx[i5] - (hightF1[xx[i6]] ^ scheduleKey[4 * k + 0])) & 0xFF);
+                xx[i7] = (byte)((xx[i7] ^ (hightF0[xx[i0]] + scheduleKey[4 * k + 3])) & 0xFF);
             }
 
-            xx[1] = (byte)(dataIn[0] - roundKey[4]);
-            xx[3] = (byte)(dataIn[2] ^ roundKey[5]);
-            xx[5] = (byte)(dataIn[4] - roundKey[6]);
-            xx[7] = (byte)(dataIn[6] ^ roundKey[7]);
+            xx[1] = (byte)(dataIn[0] - scheduleKey[4]);
+            xx[3] = (byte)(dataIn[2] ^ scheduleKey[5]);
+            xx[5] = (byte)(dataIn[4] - scheduleKey[6]);
+            xx[7] = (byte)(dataIn[6] ^ scheduleKey[7]);
 
             HIGHT_DEC(33, 7, 6, 5, 4, 3, 2, 1, 0);
             HIGHT_DEC(32, 0, 7, 6, 5, 4, 3, 2, 1);
@@ -200,10 +185,10 @@ namespace CryptoHIGHT
             dataOut[5] = (byte)(xx[5] & 0xFF);
             dataOut[7] = (byte)(xx[7] & 0xFF);
 
-            dataOut[0] = (byte)((xx[0] - roundKey[0]) & 0xFF);
-            dataOut[2] = (byte)((xx[2] ^ roundKey[1]) & 0xFF);
-            dataOut[4] = (byte)((xx[4] - roundKey[2]) & 0xFF);
-            dataOut[6] = (byte)((xx[6] ^ roundKey[3]) & 0xFF);
+            dataOut[0] = (byte)((xx[0] - scheduleKey[0]) & 0xFF);
+            dataOut[2] = (byte)((xx[2] ^ scheduleKey[1]) & 0xFF);
+            dataOut[4] = (byte)((xx[4] - scheduleKey[2]) & 0xFF);
+            dataOut[6] = (byte)((xx[6] ^ scheduleKey[3]) & 0xFF);
         }
 
         void debugPrintHex(byte[] dat)
@@ -219,7 +204,12 @@ namespace CryptoHIGHT
             Console.WriteLine("");
         }
 
-        void Encrypt(byte[] roundKey, byte[] dataIn, byte[] dataOut)
+        void debugPrintLine(string str)
+        {
+            Console.WriteLine(str);
+        }
+
+        void EncryptBlock(byte[] dataIn, byte[] dataOut)
         {
             byte[] xx = new byte[8];
             xx[1] = dataIn[1];
@@ -227,18 +217,18 @@ namespace CryptoHIGHT
             xx[5] = dataIn[5];
             xx[7] = dataIn[7];
 
-            xx[0] = (byte)((dataIn[0] + roundKey[0]) & 0xFF);
-            xx[2] = (byte)((dataIn[2] ^ roundKey[1]));
-            xx[4] = (byte)((dataIn[4] + roundKey[2]) & 0xFF);
-            xx[6] = (byte)((dataIn[6] ^ roundKey[3]));
+            xx[0] = (byte)((dataIn[0] + scheduleKey[0]) & 0xFF);
+            xx[2] = (byte)((dataIn[2] ^ scheduleKey[1]));
+            xx[4] = (byte)((dataIn[4] + scheduleKey[2]) & 0xFF);
+            xx[6] = (byte)((dataIn[6] ^ scheduleKey[3]));
 
 
             void HIGHT_ENC(int k, int i0, int i1, int i2, int i3, int i4, int i5, int i6, int i7)
             {
-                xx[i0] = (byte)((xx[i0] ^ (hightF0[xx[i1]] + roundKey[4 * k + 3])) & 0xFF);
-                xx[i2] = (byte)((xx[i2] + (hightF1[xx[i3]] ^ roundKey[4 * k + 2])) & 0xFF);
-                xx[i4] = (byte)((xx[i4] ^ (hightF0[xx[i5]] + roundKey[4 * k + 1])) & 0xFF);
-                xx[i6] = (byte)((xx[i6] + (hightF1[xx[i7]] ^ roundKey[4 * k + 0])) & 0xFF);
+                xx[i0] = (byte)((xx[i0] ^ (hightF0[xx[i1]] + scheduleKey[4 * k + 3])) & 0xFF);
+                xx[i2] = (byte)((xx[i2] + (hightF1[xx[i3]] ^ scheduleKey[4 * k + 2])) & 0xFF);
+                xx[i4] = (byte)((xx[i4] ^ (hightF0[xx[i5]] + scheduleKey[4 * k + 1])) & 0xFF);
+                xx[i6] = (byte)((xx[i6] + (hightF1[xx[i7]] ^ scheduleKey[4 * k + 0])) & 0xFF);
             }
 
             HIGHT_ENC(2, 7, 6, 5, 4, 3, 2, 1, 0);
@@ -279,36 +269,88 @@ namespace CryptoHIGHT
             dataOut[5] = (byte)(xx[6] & 0xFF);
             dataOut[7] = (byte)(xx[0] & 0xFF);
 
-            dataOut[0] = (byte)((xx[1] + roundKey[4]) & 0xFF);
-            dataOut[2] = (byte)((xx[3] ^ roundKey[5]) & 0xFF);
-            dataOut[4] = (byte)((xx[5] + roundKey[6]) & 0xFF);
-            dataOut[6] = (byte)((xx[7] ^ roundKey[7]) & 0xFF);
+            dataOut[0] = (byte)((xx[1] + scheduleKey[4]) & 0xFF);
+            dataOut[2] = (byte)((xx[3] ^ scheduleKey[5]) & 0xFF);
+            dataOut[4] = (byte)((xx[5] + scheduleKey[6]) & 0xFF);
+            dataOut[6] = (byte)((xx[7] ^ scheduleKey[7]) & 0xFF);
         }
+        public byte[] Encrypt(byte[] dataIn)
+        {
+            int length;
+            if (dataIn.Length == 0)
+            {
+                return null;
+            }
+            if ((dataIn.Length % 8) != 0)
+            {
+                length = dataIn.Length + (8 - (dataIn.Length % 8));
+            }
+            else
+            {
+                length = dataIn.Length;
+            }
+            byte[] dataOut = new byte[length];
+            byte[] tempIn = new byte[8];
+            byte[] tempOut = new byte[8];
+            byte[] dataInWithPadding = new byte[length];
+            Array.Copy(dataIn, dataInWithPadding, dataIn.Length);
 
+            for (int i = 0; i < (int)(length / 8); i++)
+            {
+                Array.Copy(dataInWithPadding, i * 8, tempIn, 0, 8);
+                EncryptBlock(tempIn, tempOut);
+                Array.Copy(tempOut, 0, dataOut, i * 8, 8);
+            }
+            return dataOut;
+        }
+        public byte[] Decrypt(byte[] dataIn)
+        {
+            int length;
+            if (dataIn.Length == 0)
+            {
+                return null;
+            }
+            if ((dataIn.Length % 8) != 0)
+            {
+                length = dataIn.Length + (8 - (dataIn.Length % 8));
+            }
+            else
+            {
+                length = dataIn.Length;
+            }
+            byte[] dataOut = new byte[length];
+            byte[] tempIn = new byte[8];
+            byte[] tempOut = new byte[8];
+            byte[] dataInWithPadding = new byte[length];
+            Array.Copy(dataIn, dataInWithPadding, dataIn.Length);
+            for (int i = 0; i < (int)(length / 8); i++)
+            {
+                Array.Copy(dataInWithPadding, i * 8, tempIn, 0, 8);
+                DecryptBlock(tempIn, tempOut);
+                Array.Copy(tempOut, 0, dataOut, i * 8, 8);
+            }
+            return dataOut;
+        }
 
         public void test()
         {
-
-
-            byte[] dataIn = new byte[8];
-            byte[] dataOut = new byte[8];
-            byte[] dataOut2 = new byte[8];
-            for (int i = 0; i < 8; i++)
+            byte[] dataIn = new byte[15];
+            byte[] dataOut = new byte[15];
+            byte[] dataOut2 = new byte[15];
+            for (int i = 0; i < 15; i++)
             {
                 dataIn[i] = (byte)i;
             }
+            debugPrintLine("schedule key data");
+            debugPrintHex(scheduleKey);
 
-            byte[] testRoundKey = KeySched(testUserKey);
-            Console.WriteLine("round key data");
-            debugPrintHex(testRoundKey);
-
-            Encrypt(testRoundKey, dataIn, dataOut);
-            Decrypt(testRoundKey, dataOut, dataOut2);
-            Console.WriteLine("origin data");
+            dataOut = Encrypt(dataIn);
+            dataOut2 = Decrypt(dataOut);
+            debugPrintLine("origin data");
             debugPrintHex(dataIn);
-            Console.WriteLine("encryption data");
+            debugPrintLine("encryption data");
             debugPrintHex(dataOut);
-            Console.WriteLine("decryption data");
+            debugPrintLine("decryption data");
             debugPrintHex(dataOut2);
         }
     }
